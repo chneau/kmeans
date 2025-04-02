@@ -35,7 +35,7 @@ func ExampleNumbers() {
 	deltaThreshold := 0.01
 	iterationThreshold := 100
 	rng := rand.New(rand.NewSource(0))
-	clusters, err := kmeans.Partition(dataset, k, deltaThreshold, iterationThreshold, rng)
+	clusters, err := kmeans.Cluster(dataset, k, deltaThreshold, iterationThreshold, rng)
 	if err != nil {
 		panic(err)
 	}
@@ -71,7 +71,7 @@ func ExampleCoordinates() {
 	deltaThreshold := 0.01
 	iterationThreshold := 100
 	rng := rand.New(rand.NewSource(0))
-	clusters, err := kmeans.Partition(dataset, k, deltaThreshold, iterationThreshold, rng)
+	clusters, err := kmeans.Cluster(dataset, k, deltaThreshold, iterationThreshold, rng)
 	if err != nil {
 		panic(err)
 	}
