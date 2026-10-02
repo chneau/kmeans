@@ -119,3 +119,60 @@ func TestClusterCoordinates(t *testing.T) {
 		}
 	}
 }
+
+func TestClusterReinitializesEmptyClusters(t *testing.T) {
+	// Centroids are sampled from the dataset, so duplicated coordinates can
+	// produce two identical centroids and therefore an empty cluster. Such a
+	// cluster must be reinitialized instead of being returned empty.
+	dataset := []Numbers{
+		0, 0, 0, 0, 0,
+		10,
+		20,
+	}
+	k := 3
+	deltaThreshold := 0.01
+	iterationThreshold := 100
+
+	expectedClusters := [][]Numbers{
+		{0, 0, 0, 0, 0},
+		{10},
+		{20},
+	}
+
+	for seed := int64(0); seed < 100; seed++ {
+		rng := rand.New(rand.NewSource(seed))
+		clusters, err := Cluster(dataset, k, deltaThreshold, iterationThreshold, rng)
+		if err != nil {
+			t.Fatalf("seed %d: unexpected error: %v", seed, err)
+		}
+
+		if len(clusters) != len(expectedClusters) {
+			t.Fatalf("seed %d: expected %d clusters, got %d", seed, len(expectedClusters), len(clusters))
+		}
+
+		matched := make([]bool, len(expectedClusters))
+		for _, cluster := range clusters {
+			if len(cluster) == 0 {
+				t.Errorf("seed %d: cluster is empty: %v", seed, clusters)
+				continue
+			}
+			found := false
+			for i, expected := range expectedClusters {
+				if !matched[i] && slices.Equal(cluster, expected) {
+					matched[i] = true
+					found = true
+					break
+				}
+			}
+			if !found {
+				t.Errorf("seed %d: unexpected cluster: %v", seed, cluster)
+			}
+		}
+
+		for i, m := range matched {
+			if !m {
+				t.Errorf("seed %d: expected cluster %v not found in %v", seed, expectedClusters[i], clusters)
+			}
+		}
+	}
+}

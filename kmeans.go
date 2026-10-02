@@ -132,10 +132,41 @@ func Cluster[T Observation](dataset []T, k int, deltaThreshold float64, iteratio
 				for d := range dim {
 					newCentroids[j][d] = sums[j][d] / float64(counts[j])
 				}
-			} else {
-				// If cluster is empty, retain the old centroid
-				newCentroids[j] = slices.Clone(centroids[j])
 			}
+		}
+
+		// Reinitialize empty clusters. A cluster becomes empty when two
+		// centroids are identical or end up closer to the same observations,
+		// which is common when the initialization picks duplicate points.
+		// Keeping the stale centroid in place would leave the cluster empty
+		// forever, so move it onto the observation that is currently farthest
+		// from the centroid it is assigned to. This pulls the empty centroid
+		// towards an under-represented region of the dataset.
+		used := make([]bool, len(dataset))
+		for j := range k {
+			if counts[j] > 0 {
+				continue
+			}
+			bestIndex := -1
+			bestDist := -1.0
+			for i := range dataset {
+				if used[i] {
+					continue
+				}
+				dist := euclideanDistance(dataset[i].Coordinates(), centroids[assignment[i]])
+				if dist > bestDist {
+					bestDist = dist
+					bestIndex = i
+				}
+			}
+			if bestIndex == -1 {
+				// No observation is available to seed the cluster, keep the
+				// previous centroid rather than producing a zero centroid.
+				newCentroids[j] = slices.Clone(centroids[j])
+				continue
+			}
+			used[bestIndex] = true
+			newCentroids[j] = slices.Clone(dataset[bestIndex].Coordinates())
 		}
 
 		// Check convergence by calculating the maximum centroid movement
@@ -154,6 +185,23 @@ func Cluster[T Observation](dataset []T, k int, deltaThreshold float64, iteratio
 		if maxMovement < deltaThreshold {
 			break
 		}
+	}
+
+	// Recompute the assignment against the final centroids so the returned
+	// clusters reflect them. Without this, a cluster that was reinitialized on
+	// the last iteration (for example when iterationThreshold is reached)
+	// could still be returned as empty.
+	for i := range dataset {
+		minDist := math.Inf(1)
+		minIndex := -1
+		for j := range centroids {
+			dist := euclideanDistance(dataset[i].Coordinates(), centroids[j])
+			if dist < minDist {
+				minDist = dist
+				minIndex = j
+			}
+		}
+		assignment[i] = minIndex
 	}
 
 	// Form clusters based on final assignments
